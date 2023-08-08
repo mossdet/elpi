@@ -20,10 +20,11 @@ function [wdwRelevantMarks, timeChannTypeValidIdxNr] = getValidMarksBig(marksLis
             bss = badSegMarks{bsi,5};
             bse = badSegMarks{bsi,6};
             bschName = badSegMarks{bsi,1};
-            if strcmp(bschName, 'All')
-                inBadMask(startSamplesVec>=bss & endSamplesVec <=bse) = true();
-            else
+            channSpec = badSegMarks{bsi,8};
+            if channSpec
                 inBadMask(ismember(marksList(:,1), bschName) & startSamplesVec>=bss & endSamplesVec <=bse) = true();
+            else
+                inBadMask(startSamplesVec>=bss & endSamplesVec <=bse) = true();
             end
         end
         inBadMask = inBadMask & not(badSegSel);
