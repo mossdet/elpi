@@ -1,4 +1,4 @@
-function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple, mtgSignalsFR] = generateMontageSignals(samplingRate, unipSignals, unipLabels, goalMtgLabels, filterValues)
+function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple, mtgSignalsFR] = generateMontageSignals(samplingRate, unipSignals, unipLabels, goalMtgLabels, filterValues, removeHarmonics)
     nrSamples = size(unipSignals,2);
     mtgLabelsTemp = lower(goalMtgLabels);
     unipLabels = lower(unipLabels);
@@ -23,11 +23,24 @@ function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple,
     mtgSignalsHFO= zeros(nrMtgs, nrSamples);
     mtgSignalsRipple = zeros(nrMtgs, nrSamples);
     mtgSignalsFR = zeros(nrMtgs, nrSamples);
+
     fltrOrder = 512;
+    noiseFreqs = 60*[1:8];
+    notchWidth=3;
+    harmonFreqs = [];
+    for nf = noiseFreqs
+        harmonFreqs = [harmonFreqs; [nf-notchWidth, nf+notchWidth]];
+    end
+    
     for mi = 1:nrMtgs
         sigA = unipSignals(cnsldtMtgList{mi,2},:);
         sigB = unipSignals(cnsldtMtgList{mi,3},:);
         mtgSignal = sigA - sigB;
+        if removeHarmonics
+            for hi = 1:size(harmonFreqs,1)
+                mtgSignal = getBandstopSignal(samplingRate, fltrOrder, harmonFreqs(hi,1), harmonFreqs(hi,2), mtgSignal);
+            end
+        end
         %mtgSignal = getHighpassedSignal(samplingRate, fltrOrder, 1, mtgSignal);
         %mtgSignal = getNotchedSignal(samplingRate, fltrOrder, 60, mtgSignal);
         mtgSignals(mi,:) = mtgSignal;

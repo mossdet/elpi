@@ -85,6 +85,11 @@ left = screenWidth*0.965;
 bottom = screenHeight*0.60;
 app.smallWdwFltrBttn.Position(1:2) = [left bottom];
 
+%% RemoveHarmonicsCheckBox
+left = screenWidth*0.955;
+bottom = screenHeight*0.75;
+app.RemoveHarmonicsCheckBox.Position(1:2) = [left bottom];
+
 %% heatmapFltrBttn
 left = screenWidth*0.965;
 bottom = screenHeight*0.20;
