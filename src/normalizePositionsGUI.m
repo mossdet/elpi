@@ -2,6 +2,7 @@ function normalizePositionsGUI(app)
     screenSize = get(groot,'ScreenSize');
     screenWidth = screenSize(3);
     screenHeight = screenSize(4);
+
 %% Warning Text
 left = screenWidth*0.2;
 bottom = screenHeight*0.7;
@@ -95,11 +96,10 @@ left = screenWidth*0.98;
 bottom = screenHeight*0.40;
 app.NIButton.Position(1:2) = [left bottom];
 
-%% NIButton
-left = screenWidth*0.98;
-bottom = screenHeight*0.35;
+%% noiseIdxStr
+left = screenWidth*0.9675;
+bottom = screenHeight*0.36;
 app.noiseIdxStr.Position(1:2) = [left bottom];
-
 
 %% heatmapFltrBttn
 left = screenWidth*0.965;
