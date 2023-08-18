@@ -80,15 +80,26 @@ left = screenWidth*0.975;
 bottom = screenHeight*0.825;
 app.markModeTxtSmall.Position(1:2) = [left bottom];
 
+%% RemoveHarmonicsCheckBox
+left = screenWidth*0.965;
+bottom = screenHeight*0.75;
+app.RemoveEMIHarmonicsCheckBox.Position(1:2) = [left bottom];
+
 %% smallWdwFltrBttn
 left = screenWidth*0.965;
 bottom = screenHeight*0.60;
 app.smallWdwFltrBttn.Position(1:2) = [left bottom];
 
-%% RemoveHarmonicsCheckBox
-left = screenWidth*0.955;
-bottom = screenHeight*0.75;
-app.RemoveHarmonicsCheckBox.Position(1:2) = [left bottom];
+%% NIButton
+left = screenWidth*0.98;
+bottom = screenHeight*0.40;
+app.NIButton.Position(1:2) = [left bottom];
+
+%% NIButton
+left = screenWidth*0.98;
+bottom = screenHeight*0.35;
+app.noiseIdxStr.Position(1:2) = [left bottom];
+
 
 %% heatmapFltrBttn
 left = screenWidth*0.965;

@@ -1,4 +1,4 @@
-function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple, mtgSignalsFR] = generateMontageSignals(samplingRate, unipSignals, unipLabels, goalMtgLabels, filterValues, removeHarmonics)
+function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple, mtgSignalsFR] = generateMontageSignals(samplingRate, unipSignals, unipLabels, goalMtgLabels, filterValues, notchSettings, notchOK)
     nrSamples = size(unipSignals,2);
     mtgLabelsTemp = lower(goalMtgLabels);
     unipLabels = lower(unipLabels);
@@ -17,6 +17,7 @@ function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple,
         end
     end
     nrMtgs = size(cnsldtMtgList,1);
+    mtgLabels = cnsldtMtgList(:,1);
 
     mtgSignals = zeros(nrMtgs, nrSamples);
     mtgSignalsLow = zeros(nrMtgs, nrSamples);
@@ -24,21 +25,19 @@ function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple,
     mtgSignalsRipple = zeros(nrMtgs, nrSamples);
     mtgSignalsFR = zeros(nrMtgs, nrSamples);
 
-    fltrOrder = 512;
-    noiseFreqs = 60*[1:8];
-    notchWidth=3;
-    harmonFreqs = [];
-    for nf = noiseFreqs
-        harmonFreqs = [harmonFreqs; [nf-notchWidth, nf+notchWidth]];
-    end
+    notchWidth=2;
+    notchOrder = notchSettings.order;
+    harmonFreqs = [notchSettings.freqs - notchWidth, notchSettings.freqs + notchWidth];
     
     for mi = 1:nrMtgs
         sigA = unipSignals(cnsldtMtgList{mi,2},:);
         sigB = unipSignals(cnsldtMtgList{mi,3},:);
         mtgSignal = sigA - sigB;
-        if removeHarmonics
-            for hi = 1:size(harmonFreqs,1)
-                mtgSignal = getBandstopSignal(samplingRate, fltrOrder, harmonFreqs(hi,1), harmonFreqs(hi,2), mtgSignal);
+        if notchOK
+            if sum(ismember(notchSettings.channs, mtgLabels{mi})==1)
+                for hi = 1:size(harmonFreqs,1)
+                    mtgSignal = getBandstopSignal(samplingRate, notchOrder, harmonFreqs(hi,1), harmonFreqs(hi,2), mtgSignal);
+                end
             end
         end
         %mtgSignal = getHighpassedSignal(samplingRate, fltrOrder, 1, mtgSignal);
@@ -49,5 +48,5 @@ function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple,
         mtgSignalsRipple(mi,:) = getBandpassedSignal(samplingRate, filterValues(3,3), filterValues(3,1), filterValues(3,2), mtgSignal);
         mtgSignalsFR(mi,:) = getBandpassedSignal(samplingRate, filterValues(4,3), filterValues(4,1), filterValues(4,2), mtgSignal);
     end
-    mtgLabels = cnsldtMtgList(:,1);
+
 end
