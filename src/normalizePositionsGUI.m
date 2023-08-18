@@ -3,6 +3,9 @@ function normalizePositionsGUI(app)
     screenWidth = screenSize(3);
     screenHeight = screenSize(4);
 
+%app.annotateHFO_GUI.Position = screenSize;
+
+
 %% Warning Text
 left = screenWidth*0.2;
 bottom = screenHeight*0.7;
@@ -19,7 +22,7 @@ app.bigWdw.Position = [left bottom width height];
 left = screenWidth*0.50;
 bottom = screenHeight*0.30;
 width = screenWidth*0.45;
-height = screenHeight*0.58;
+height = screenHeight*0.60;
 app.smallWdw.Position = [left bottom width height];
 
 %% heatmap
@@ -41,23 +44,23 @@ app.smallWdwSlider.Position(1:2) = [left bottom];
 
 %% bigWdwFltrBttn
 left = screenWidth*0.3;
-bottom = screenHeight*0.88;
+bottom = screenHeight*0.90;
 app.bigWdwFltrBttn.Position(1:2) = [left bottom];
 buttonWidth = app.bigWdwFltrBttn.Position(3);
 
 %% wdwsLengthLabel
 left = screenWidth*0.42;
-bottom = screenHeight*0.88;
+bottom = screenHeight*0.90;
 app.wdwsLengthLabel.Position(1:2) = [left bottom];
 
 %% bigWdwSetLen
 left = sum(app.wdwsLengthLabel.Position([1 3]));
-bottom = screenHeight*0.88;
+bottom = screenHeight*0.90;
 app.bigWdwSetLen.Position(1:3) = [left bottom buttonWidth];
 
 %% smallWdwSetLen
 left = sum(app.bigWdwSetLen.Position([1 3]));
-bottom = screenHeight*0.88;
+bottom = screenHeight*0.90;
 %app.smallWdwSetLen.Position = [left bottom width height];
 app.smallWdwSetLen.Position(1:3) = [left bottom buttonWidth];
 
