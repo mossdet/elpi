@@ -94,11 +94,6 @@ left = screenWidth*0.965;
 bottom = screenHeight*0.60;
 app.smallWdwFltrBttn.Position(1:2) = [left bottom];
 
-%% NIButton
-left = screenWidth*0.98;
-bottom = screenHeight*0.40;
-app.NIButton.Position(1:2) = [left bottom];
-
 %% noiseIdxStr
 left = screenWidth*0.9675;
 bottom = screenHeight*0.36;
