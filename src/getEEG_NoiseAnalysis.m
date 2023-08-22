@@ -2,7 +2,7 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
 
     nSamples = size(mtgSignals,2);
     nrMtgs = size(mtgLabels,1);
-    stepSize = fs*5;
+    stepSize = fs*10;
     wdwSize = fs*10;
     ssVec = 1:stepSize:nSamples-wdwSize;
     timeVec = zeros(1, length(ssVec));
@@ -12,7 +12,7 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     parfor si = 1:length(ssVec)
         startSample = ssVec(si);
         endSample = startSample+wdwSize-1;
-        timestamp = startSample/fs;
+        timestamp = (startSample-1)/fs;
         dataWin = mtgSignals(:, startSample:endSample);
 
         channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin);
