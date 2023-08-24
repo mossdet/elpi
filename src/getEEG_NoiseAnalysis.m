@@ -9,14 +9,16 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     chavg_ni_vec = zeros(1, length(ssVec));
     chspec_ni_vec = zeros(nrMtgs, length(ssVec));
 
-    parfor si = 1:length(ssVec)
+    polyOrder = 10;
+
+    for si = 1:length(ssVec)
         startSample = ssVec(si);
         endSample = startSample+wdwSize-1;
         timestamp = (startSample-1)/fs;
         dataWin = mtgSignals(:, startSample:endSample);
 
-        channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin);
-        chAvgNI = getChAvgNI(fs, mtgLabels, dataWin);
+        channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder);
+        chAvgNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder);
 
         chspec_ni_vec(:,si) = channSpecNI;
         chavg_ni_vec(si) = chAvgNI;
@@ -24,7 +26,7 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     end
 end
 
-function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin)
+function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
     
     nSamples = size(dataWin,2);
     nrMtgs = size(mtgLabels,1);
@@ -53,7 +55,7 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin)
         %Chann Spec Spectrum Regression
         chDataSpctrm = movmean(chDataSpctrm,10);
         chDataSpctrm = rescale(log10(chDataSpctrm));
-        [p, S] = polyfit(freqs, chDataSpctrm, 10);
+        [p, S] = polyfit(freqs, chDataSpctrm, polyOrder);
         [chSpecModelY, ~] = polyval(p, freqs, S);
         chSpecModelYVec(mi,:) = chSpecModelY;
         %Get error from chann spec regression
@@ -71,7 +73,7 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin)
     %Chann Avg Spectrum Regression
     avgDataSpctrm = avgDataSpctrm/nrMtgs;
     avgDataSpctrm = rescale(log10(avgDataSpctrm));
-    [p, S] = polyfit(freqs, avgDataSpctrm, 10);
+    [p, S] = polyfit(freqs, avgDataSpctrm, polyOrder);
     [avgDataModelY, ~] = polyval(p, freqs, S);
     
     channSpecNI = zeros(nrMtgs, 1);
@@ -92,7 +94,7 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin)
     end
 end
 
-function wdwNI = getChAvgNI(fs, mtgLabels, dataWin)
+function wdwNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder)
     
     wdwNI = 0;
     nSamples = size(dataWin,2);
@@ -120,7 +122,7 @@ function wdwNI = getChAvgNI(fs, mtgLabels, dataWin)
     %Chann Avg Spectrum Regression
     avgDataSpctrm = avgDataSpctrm/nrMtgs;
     avgDataSpctrm = rescale(log10(avgDataSpctrm));
-    [p, S] = polyfit(freqs, avgDataSpctrm, 10);
+    [p, S] = polyfit(freqs, avgDataSpctrm, polyOrder);
     [avgDataModelY, ~] = polyval(p, freqs, S);
     % Chann Avg R2
     ssr = mean((avgDataSpctrm-avgDataModelY).^2);
