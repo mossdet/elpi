@@ -94,8 +94,13 @@ left = screenWidth*0.965;
 bottom = screenHeight*0.60;
 app.smallWdwFltrBttn.Position(1:2) = [left bottom];
 
+%% eegNIStr
+left = screenWidth*0.975;
+bottom = screenHeight*0.40;
+app.eegNIStr.Position(1:2) = [left bottom];
+
 %% noiseIdxStr
-left = screenWidth*0.9675;
+left = screenWidth*0.9725;
 bottom = screenHeight*0.36;
 app.noiseIdxStr.Position(1:2) = [left bottom];
 

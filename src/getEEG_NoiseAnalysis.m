@@ -9,8 +9,11 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     chavg_ni_vec = zeros(1, length(ssVec));
     chspec_ni_vec = zeros(nrMtgs, length(ssVec));
 
+    clc;
     polyOrder = 10;
 
+    % allGoodSpctrmCnt = 0;
+    % allGoodSpctrmSum = [];
     for si = 1:length(ssVec)
         startSample = ssVec(si);
         endSample = startSample+wdwSize-1;
@@ -20,10 +23,43 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
         channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder);
         chAvgNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder);
 
+        %[wdwGoodSpctrmCnt, wdwGoodSpctrmSum] = getChannPerfCompareNI(fs, mtgLabels, dataWin, polyOrder);
+        % allGoodSpctrmCnt = allGoodSpctrmCnt + wdwGoodSpctrmCnt;
+        % if ~isempty(wdwGoodSpctrmSum)
+        %     if isempty(allGoodSpctrmSum)
+        %         allGoodSpctrmSum = wdwGoodSpctrmSum;
+        %     else
+        %         allGoodSpctrmSum = allGoodSpctrmSum + wdwGoodSpctrmSum;
+        %     end
+        % end
+
         chspec_ni_vec(:,si) = channSpecNI;
         chavg_ni_vec(si) = chAvgNI;
         timeVec(si) = timestamp;
     end
+
+    % fftFreqs = fs*(0:(wdwSize/2))/wdwSize;
+    % delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
+    % fftFreqs(delSel) = [];
+    % 
+    % allGoodSpctrmAvg = allGoodSpctrmSum/allGoodSpctrmCnt;
+    % allGoodSpctrmAvg = movmean(allGoodSpctrmAvg,10);
+    % allGoodSpctrmAvg = rescale(log10(allGoodSpctrmAvg));
+    % [p, S] = polyfit(fftFreqs, allGoodSpctrmAvg, polyOrder);
+    % [goodSptrmModelY, ~] = polyval(p, fftFreqs, S);
+    % 
+    % plot(fftFreqs, allGoodSpctrmAvg); hold on;
+    % plot(fftFreqs, goodSptrmModelY); hold on;
+    % legend("allGoodSpctrmAvg", "goodSptrmModelY")
+    % close();
+
+    % for si = 1:length(ssVec)
+    %     startSample = ssVec(si);
+    %     endSample = startSample+wdwSize-1;
+    %     dataWin = mtgSignals(:, startSample:endSample);
+    %     chAvgNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder);
+    %     chavg_ni_vec(si) = chAvgNI;
+    % end
 end
 
 function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
@@ -31,17 +67,18 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
     nSamples = size(dataWin,2);
     nrMtgs = size(mtgLabels,1);
     if nrMtgs <= 10
-        channSpecNI = repmat(NaN, 1, nrMtgs);
+        channSpecNI = NaN(1, nrMtgs);
         return;
     end
 
-    freqs = fs*(0:(nSamples/2))/nSamples;
-    delSel = (freqs < 1) | (freqs > 341.33);
-	freqs(delSel) = [];
+    fftFreqs = fs*(0:(nSamples/2))/nSamples;
+    delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
+	fftFreqs(delSel) = [];
 
-    avgDataSpctrm = zeros(1, length(freqs));
-    chSpecModelYVec = zeros(nrMtgs, length(freqs));
+    avgDataSpctrm = zeros(1, length(fftFreqs));
+    chSpecModelYVec = zeros(nrMtgs, length(fftFreqs));
     chSpecModelR2Vec = zeros(nrMtgs,1);
+
     for mi = 1:nrMtgs
         %Chann Spectrum
         chData = dataWin(mi,:);
@@ -55,26 +92,38 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
         %Chann Spec Spectrum Regression
         chDataSpctrm = movmean(chDataSpctrm,10);
         chDataSpctrm = rescale(log10(chDataSpctrm));
-        [p, S] = polyfit(freqs, chDataSpctrm, polyOrder);
-        [chSpecModelY, ~] = polyval(p, freqs, S);
+        [p, S] = polyfit(fftFreqs, chDataSpctrm, polyOrder);
+        [chSpecModelY, ~] = polyval(p, fftFreqs, S);
         chSpecModelYVec(mi,:) = chSpecModelY;
         %Get error from chann spec regression
-        ssr = mean((chDataSpctrm-chSpecModelY).^2);
-        sst = mean((chDataSpctrm-mean(chDataSpctrm)).^2);
+        ssr = sum((chDataSpctrm-chSpecModelY).^2);
+        sst = sum((chDataSpctrm-mean(chDataSpctrm)).^2);
         chSpecModelR2 = ssr/sst;
         chSpecModelR2Vec(mi) = chSpecModelR2;
 
-        % plot(freqs, chDataSpctrm); hold on;
-        % plot(freqs, chSpecModelY); hold on;
-        % legend("Chann.Signal FFT", "Chann.Signal ")
+        % close all;
+        % subplot(3,3,1)
+        % plot((0:length(chData)-1)/fs, chData, '-k');
+        % legend("Chann.Signal ")
         % title(mtgLabels{mi})
+        % 
+        % subplot(3,3,2)
+        % plot(fftFreqs, chDataSpctrm, '-k'); hold on;
+        % plot(fftFreqs, chSpecModelY, '-r', 'LineWidth', 2); hold on;
+        % legendStr = strcat("Chann ModelFFT (NI_1: ", num2str(chSpecModelR2, '%.2f'), ")");
+        % legend("ChannFFT", legendStr);
+        % 
+        % set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
+        % figFilename = strcat("F:\Postdoc_Calgary\Presentations\images\", mtgLabels{mi}, '_ChannSpec_N1', '.png');
+        % saveas(gcf,figFilename);
+        % close();
     end
 
     %Chann Avg Spectrum Regression
     avgDataSpctrm = avgDataSpctrm/nrMtgs;
     avgDataSpctrm = rescale(log10(avgDataSpctrm));
-    [p, S] = polyfit(freqs, avgDataSpctrm, polyOrder);
-    [avgDataModelY, ~] = polyval(p, freqs, S);
+    [p, S] = polyfit(fftFreqs, avgDataSpctrm, polyOrder);
+    [avgDataModelY, ~] = polyval(p, fftFreqs, S);
     
     channSpecNI = zeros(nrMtgs, 1);
     for mi = 1:nrMtgs
@@ -82,8 +131,8 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
         chSpecModelY = chSpecModelYVec(mi,:);
 
         % Get error between chann spec and chann avg regression
-        ssr = mean((avgDataModelY-chSpecModelY).^2);
-        sst = mean((avgDataModelY-mean(avgDataModelY)).^2);
+        ssr = sum((avgDataModelY-chSpecModelY).^2);
+        sst = sum((avgDataModelY-mean(avgDataModelY)).^2);
         chSpecChAvgModelsR2 = ssr/sst;
         if chSpecChAvgModelsR2 > 1
             chSpecChAvgModelsR2 = 1;
@@ -91,6 +140,77 @@ function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
 
         chNI = mean([chSpecModelR2, chSpecChAvgModelsR2]);
         channSpecNI(mi) = chNI;
+
+        % close all;
+        % subplot(3,3,3)
+        % plot(fftFreqs, avgDataSpctrm, '-k'); hold on;
+        % plot(fftFreqs, avgDataModelY, '-r', 'LineWidth', 2); hold on;
+        % plot(fftFreqs, chSpecModelY, '-g', 'LineWidth', 2); hold on;
+        % legendStr = strcat("ChannModelFFT (NI_2", num2str(chSpecChAvgModelsR2, '%.2f'), ")");
+        % legend("Avg.Chann FFT", "Avg.Chann ModelFFT", legendStr);
+        % sgtitle({mtgLabels{mi}; strcat("Channel Specfic NI:", num2str(chNI, '%.2f'))});
+        % 
+        % set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
+        % figFilename = strcat("F:\Postdoc_Calgary\Presentations\images\", mtgLabels{mi}, '_ChannSpec_N2', '.png');
+        % saveas(gcf,figFilename);
+        % close();
+    end
+end
+
+function [goodSpctrmCnt, goodSpctrmSum] = getChannPerfCompareNI(fs, mtgLabels, dataWin, polyOrder)
+    
+    nSamples = size(dataWin,2);
+    nrMtgs = size(mtgLabels,1);
+    if nrMtgs <= 10
+        channSpecNI = NaN(1, nrMtgs);
+        return;
+    end
+
+    fftFreqs = fs*(0:(nSamples/2))/nSamples;
+    delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
+	fftFreqs(delSel) = [];
+
+    chSpecModelR2Vec = zeros(nrMtgs,1);
+    goodSpctrmSum = [];
+    goodSpctrmCnt = 0;
+    for mi = 1:nrMtgs
+        %Chann Spectrum
+        chData = dataWin(mi,:);
+        P2 = abs(fft(chData)/nSamples);
+        chDataSpctrm = P2(1:nSamples/2+1);
+        chDataSpctrm(2:end-1) = 2*chDataSpctrm(2:end-1);
+        chDataSpctrm = real(chDataSpctrm);
+        chDataSpctrm = chDataSpctrm(~delSel); 
+
+        %Chann Spec Spectrum Regression
+        chDataSpctrm = movmean(chDataSpctrm,10);
+        chDataSpctrm = rescale(log10(chDataSpctrm));
+        [p, S] = polyfit(fftFreqs, chDataSpctrm, polyOrder);
+        [chSpecModelY, ~] = polyval(p, fftFreqs, S);
+
+        [perfDataFreqs, perfDataModel] = getPerfEEGChannAvg_RegressionVals();
+
+
+        ssr = sum((perfDataModel-chSpecModelY).^2);
+        sst = sum((perfDataModel-mean(perfDataModel)).^2);
+        chSpecModelR2 = ssr/sst;
+        chSpecModelR2Vec(mi) = chSpecModelR2;
+
+        if chSpecModelR2 <= 0.05
+            if isempty(goodSpctrmSum)
+                goodSpctrmSum = chSpecModelY;
+            else
+                goodSpctrmSum = goodSpctrmSum+chSpecModelY;
+            end
+            goodSpctrmCnt = goodSpctrmCnt+1;
+
+            plot(fftFreqs, chDataSpctrm); hold on;
+            plot(fftFreqs, chSpecModelY); hold on;
+            plot(fftFreqs, perfDataModel); hold on;
+            legend("Chann.Signal FFT", "Chann.Signal ", "Perfect Data Model")
+            title({mtgLabels{mi}; strcat("R^2: ", num2str(chSpecModelR2, '%.2f'))})
+            close();
+        end
     end
 end
 
@@ -104,11 +224,11 @@ function wdwNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder)
         return;
     end
 
-    freqs = fs*(0:(nSamples/2))/nSamples;
-    delSel = (freqs < 1) | (freqs > 341.33);
-	freqs(delSel) = [];
+    fftFreqs = fs*(0:(nSamples/2))/nSamples;
+    delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
+	fftFreqs(delSel) = [];
 
-    avgDataSpctrm = zeros(1, length(freqs));
+    avgDataSpctrm = zeros(1, length(fftFreqs));
     for mi = 1:nrMtgs
         %Chann Spectrum
         chData = dataWin(mi,:);
@@ -122,11 +242,11 @@ function wdwNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder)
     %Chann Avg Spectrum Regression
     avgDataSpctrm = avgDataSpctrm/nrMtgs;
     avgDataSpctrm = rescale(log10(avgDataSpctrm));
-    [p, S] = polyfit(freqs, avgDataSpctrm, polyOrder);
-    [avgDataModelY, ~] = polyval(p, freqs, S);
+    [p, S] = polyfit(fftFreqs, avgDataSpctrm, polyOrder);
+    [avgDataModelY, ~] = polyval(p, fftFreqs, S);
     % Chann Avg R2
-    ssr = mean((avgDataSpctrm-avgDataModelY).^2);
-    sst = mean((avgDataSpctrm-mean(avgDataSpctrm)).^2);
+    ssr = sum((avgDataSpctrm-avgDataModelY).^2);
+    sst = sum((avgDataSpctrm-mean(avgDataSpctrm)).^2);
     avgDataModelR2 = ssr/sst;
 
     % avgDataModelY vs idealDataModel R2
@@ -140,11 +260,14 @@ function wdwNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder)
 
     wdwNI = mean([avgDataModelR2, avgData_PerfData_R2]);
 
-    % plot(freqs, avgDataSpctrm); hold on;
-    % plot(freqs, avgDataModelY); hold on;
-    % plot(freqs, perfDataModel); hold on;
-    % legend('avgDataSpctrm', strcat('avgDataModelY (R2:', num2str(avgDataModelR2, '%.2f'), ')'), strcat('perfDataModel (R2:', num2str(avgData_PerfData_R2, '%.2f'), ')'))
-    % title(strcat('Window Noise Index:', num2str(wdwNI, '%.2f'), ')'));
+    % plot(fftFreqs, avgDataSpctrm, 'k'); hold on;
+    % plot(fftFreqs, avgDataModelY, '-r', 'LineWidth', 4); hold on;
+    % plot(fftFreqs, perfDataModel, '-g', 'LineWidth', 4); hold on;
+    % legend('WdwAvg FFT', strcat('WdwAvg ModelFFT (R2:', num2str(avgDataModelR2, '%.2f'), ')'), strcat('IdealData ModelFFT (R2:', num2str(avgData_PerfData_R2, '%.2f'), ')'))
+    % title(strcat('Window Noise Index:', num2str(wdwNI, '%.2f')));
+    % set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
+    % figFilename = strcat("F:\Postdoc_Calgary\Presentations\images\", mtgLabels{mi}, '_ChannAvg_NI', '.png');
+    % saveas(gcf,figFilename);
     % close();
 end
 
