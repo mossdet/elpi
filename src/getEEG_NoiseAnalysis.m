@@ -1,4 +1,4 @@
-function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLabels, mtgSignals)
+function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLabels, mtgSignals, notched, notchFreqs)
 
     nSamples = size(mtgSignals,2);
     nrMtgs = size(mtgLabels,1);
@@ -12,54 +12,148 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     clc;
     polyOrder = 10;
 
-    % allGoodSpctrmCnt = 0;
-    % allGoodSpctrmSum = [];
+    notchWidth = 5;
+    harmonFreqs = [notchFreqs - notchWidth, notchFreqs + notchWidth];
+
     for si = 1:length(ssVec)
         startSample = ssVec(si);
         endSample = startSample+wdwSize-1;
         timestamp = (startSample-1)/fs;
         dataWin = mtgSignals(:, startSample:endSample);
 
-        channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder);
-        chAvgNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder);
-
-        %[wdwGoodSpctrmCnt, wdwGoodSpctrmSum] = getChannPerfCompareNI(fs, mtgLabels, dataWin, polyOrder);
-        % allGoodSpctrmCnt = allGoodSpctrmCnt + wdwGoodSpctrmCnt;
-        % if ~isempty(wdwGoodSpctrmSum)
-        %     if isempty(allGoodSpctrmSum)
-        %         allGoodSpctrmSum = wdwGoodSpctrmSum;
-        %     else
-        %         allGoodSpctrmSum = allGoodSpctrmSum + wdwGoodSpctrmSum;
-        %     end
-        % end
+        channSpecNI = getPerfChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder, notched, harmonFreqs);
+        %channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder);
+        %chAvgNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder);
 
         chspec_ni_vec(:,si) = channSpecNI;
-        chavg_ni_vec(si) = chAvgNI;
+        chavg_ni_vec(si) = mean(channSpecNI);%chAvgNI;
         timeVec(si) = timestamp;
     end
+end
 
-    % fftFreqs = fs*(0:(wdwSize/2))/wdwSize;
-    % delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
-    % fftFreqs(delSel) = [];
-    % 
-    % allGoodSpctrmAvg = allGoodSpctrmSum/allGoodSpctrmCnt;
-    % allGoodSpctrmAvg = movmean(allGoodSpctrmAvg,10);
-    % allGoodSpctrmAvg = rescale(log10(allGoodSpctrmAvg));
-    % [p, S] = polyfit(fftFreqs, allGoodSpctrmAvg, polyOrder);
-    % [goodSptrmModelY, ~] = polyval(p, fftFreqs, S);
-    % 
-    % plot(fftFreqs, allGoodSpctrmAvg); hold on;
-    % plot(fftFreqs, goodSptrmModelY); hold on;
-    % legend("allGoodSpctrmAvg", "goodSptrmModelY")
-    % close();
+function channSpecNI = getPerfChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder, notched, harmonFreqs)
+    
+    nSamples = size(dataWin,2);
+    nrMtgs = size(mtgLabels,1);
+    fftFreqs = fs*(0:(nSamples/2))/nSamples;
+    delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
 
-    % for si = 1:length(ssVec)
-    %     startSample = ssVec(si);
-    %     endSample = startSample+wdwSize-1;
-    %     dataWin = mtgSignals(:, startSample:endSample);
-    %     chAvgNI = getChAvgNI(fs, mtgLabels, dataWin, polyOrder);
-    %     chavg_ni_vec(si) = chAvgNI;
-    % end
+    if notched
+        for hfi = 1:length(harmonFreqs)
+            pwlFreqL = harmonFreqs(hfi,1);
+            pwlFreqH = harmonFreqs(hfi,2);
+            selVec = fftFreqs >= pwlFreqL & fftFreqs <= pwlFreqH;
+            delSel(selVec) = true;
+        end
+    end
+    fftFreqs(delSel) = [];
+
+    avgDataSpctrm = zeros(1, length(fftFreqs));
+    chSpecModelYVec = zeros(nrMtgs, length(fftFreqs));
+    chSpecModelR2Vec = zeros(nrMtgs,1);
+
+    for mi = 1:nrMtgs
+        %Chann Spectrum
+        chData = dataWin(mi,:);
+        P2 = abs(fft(chData)/nSamples);
+        chDataSpctrm = P2(1:nSamples/2+1);
+        chDataSpctrm(2:end-1) = 2*chDataSpctrm(2:end-1);
+        chDataSpctrm = real(chDataSpctrm);
+        chDataSpctrm = chDataSpctrm(~delSel); 
+        avgDataSpctrm = avgDataSpctrm+chDataSpctrm;
+
+        %Chann Spec Spectrum Regression
+        chDataSpctrm = movmean(chDataSpctrm,10);
+        chDataSpctrm = rescale(log10(chDataSpctrm));
+        [p, S] = polyfit(fftFreqs, chDataSpctrm, polyOrder);
+        [chSpecModelY, ~] = polyval(p, fftFreqs, S);
+        chSpecModelYVec(mi,:) = chSpecModelY;
+        %Get error from chann spec regression
+        ssr = sum((chDataSpctrm-chSpecModelY).^2);
+        sst = sum((chDataSpctrm-mean(chDataSpctrm)).^2);
+        chSpecModelR2 = ssr/sst;
+        chSpecModelR2Vec(mi) = chSpecModelR2;
+
+        % close all;
+        % subplot(3,3,1)
+        % plot((0:length(chData)-1)/fs, chData, '-k');
+        % legend("Chann.Signal ")
+        % title(mtgLabels{mi})
+        % 
+        % subplot(3,3,2)
+        % plot(fftFreqs, chDataSpctrm, '-k'); hold on;
+        % plot(fftFreqs, chSpecModelY, '-r', 'LineWidth', 2); hold on;
+        % legendStr = strcat("Chann ModelFFT (NI_1: ", num2str(chSpecModelR2, '%.2f'), ")");
+        % legend("ChannFFT", legendStr);
+        % 
+        % set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
+        % figFilename = strcat("F:\Postdoc_Calgary\Presentations\images\", mtgLabels{mi}, '_ChannSpec_N1', '.png');
+        % saveas(gcf,figFilename);
+        % close();
+    end
+
+    %Chann Avg Spectrum Regression
+    avgDataSpctrm = avgDataSpctrm/nrMtgs;
+    avgDataSpctrm = rescale(log10(avgDataSpctrm));
+    [p, S] = polyfit(fftFreqs, avgDataSpctrm, polyOrder);
+    [avgDataModelY, ~] = polyval(p, fftFreqs, S);
+
+    [perfDataFreqs, perfDataModel] = getPerfEEGChannAvg_RegressionVals();
+    delSel = false(length(perfDataFreqs),1);
+    if notched
+        for hfi = 1:length(harmonFreqs)
+            pwlFreqL = harmonFreqs(hfi,1);
+            pwlFreqH = harmonFreqs(hfi,2);
+            selVec = perfDataFreqs >= pwlFreqL & perfDataFreqs <= pwlFreqH;
+            delSel(selVec) = true;
+        end
+    end
+    perfDataModel(delSel) = [];
+
+    channSpecNI = zeros(nrMtgs, 1);
+    for mi = 1:nrMtgs
+        chSpecModelR2 = chSpecModelR2Vec(mi);
+        chSpecModelY = chSpecModelYVec(mi,:);
+
+        % Get error between chann spec and chann avg regression
+        ssr = sum((avgDataModelY-chSpecModelY).^2);
+        sst = sum((avgDataModelY-mean(avgDataModelY)).^2);
+        chSpecChAvgModelsR2 = ssr/sst;
+        if chSpecChAvgModelsR2 > 1
+            chSpecChAvgModelsR2 = 1;
+        end
+
+        % Get error between chann avg and perf spectrum regression
+        ssr = sum((perfDataModel-chSpecModelY).^2); % Residual Sum-Of-Squares
+        sst = sum((perfDataModel-mean(perfDataModel)).^2); % Total Sum-Of-Squares
+        avgData_PerfData_R2 = ssr/sst;
+        if avgData_PerfData_R2>1
+            avgData_PerfData_R2 = 1;
+        end
+        % chSpecChAvgModelsR2 = mean([chSpecChAvgModelsR2, avgData_PerfData_R2]);
+        % if chSpecChAvgModelsR2 > 1
+        %     chSpecChAvgModelsR2 = 1;
+        % end
+
+        chNI = mean([chSpecModelR2, chSpecChAvgModelsR2, avgData_PerfData_R2]);
+        %chNI = mean([chSpecModelR2, chSpecChAvgModelsR2]);
+
+        channSpecNI(mi) = chNI;
+
+        % close all;
+        % subplot(3,3,3)
+        % plot(fftFreqs, avgDataSpctrm, '-k'); hold on;
+        % plot(fftFreqs, avgDataModelY, '-r', 'LineWidth', 2); hold on;
+        % plot(fftFreqs, chSpecModelY, '-g', 'LineWidth', 2); hold on;
+        % legendStr = strcat("ChannModelFFT (NI_2", num2str(chSpecChAvgModelsR2, '%.2f'), ")");
+        % legend("Avg.Chann FFT", "Avg.Chann ModelFFT", legendStr);
+        % sgtitle({mtgLabels{mi}; strcat("Channel Specfic NI:", num2str(chNI, '%.2f'))});
+        % 
+        % set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
+        % figFilename = strcat("F:\Postdoc_Calgary\Presentations\images\", mtgLabels{mi}, '_ChannSpec_N2', '.png');
+        % %saveas(gcf,figFilename);
+        % close();
+    end
 end
 
 function channSpecNI = getChannSpecNoiseIdx(fs, mtgLabels, dataWin, polyOrder)
