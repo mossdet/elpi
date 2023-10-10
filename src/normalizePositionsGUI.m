@@ -84,11 +84,6 @@ left = screenWidth*0.975;
 bottom = screenHeight*0.825;
 app.markModeTxtSmall.Position(1:2) = [left bottom];
 
-%% RemoveHarmonicsCheckBox
-left = screenWidth*0.965;
-bottom = screenHeight*0.75;
-app.RemoveEMIHarmonicsCheckBox.Position(1:2) = [left bottom];
-
 %% smallWdwFltrBttn
 left = screenWidth*0.965;
 bottom = screenHeight*0.60;
