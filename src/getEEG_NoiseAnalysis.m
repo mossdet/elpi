@@ -12,8 +12,10 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     clc;
     polyOrder = 10;
 
-    notchWidth = 5;
+    notchWidth = 8;
     harmonFreqs = [notchFreqs - notchWidth, notchFreqs + notchWidth];
+
+    ideal_spctrm = getIdealSignalSpectrum(fs, wdwSize, polyOrder, notched, harmonFreqs);
 
     for si = 1:length(ssVec)
         startSample = ssVec(si);
@@ -21,7 +23,7 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
         timestamp = (startSample-1)/fs;
         dataWin = mtgSignals(:, startSample:endSample);
 
-        channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, dataWin, polyOrder, notched, harmonFreqs);
+        channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, dataWin, polyOrder, ideal_spctrm, notched, harmonFreqs);
 
         chspec_ni_vec(:,si) = channSpecNI;
         chavg_ni_vec(si) = mean(channSpecNI);%chAvgNI;
@@ -29,7 +31,44 @@ function [timeVec, chspec_ni_vec, chavg_ni_vec] = getEEG_NoiseAnalysis(fs, mtgLa
     end
 end
 
-function channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, dataWin, polyOrder, notched, harmonFreqs)
+function idealSignalSpectrum = getIdealSignalSpectrum(fs, wdwSize, polyOrder, notched, harmonFreqs)
+
+    nSamples = wdwSize;
+
+    % determine which frequencies to use for extrapolation of the ideal
+    % spectrum
+    fftFreqs = fs*(0:(nSamples/2))/nSamples;
+    delSel = (fftFreqs < 1) | (fftFreqs > 341.33);
+    if notched
+        for hfi = 1:length(harmonFreqs)
+            pwlFreqL = harmonFreqs(hfi,1);
+            pwlFreqH = harmonFreqs(hfi,2);
+            selVec = fftFreqs >= pwlFreqL & fftFreqs <= pwlFreqH;
+            delSel(selVec) = true;
+        end
+    end
+    fftFreqs(delSel) = [];
+
+
+    % get ideal spectrum and determine which frequencies to use for extrapolation
+    [perfDataFreqs, perfDataModel] = getPerfEEGChannAvg_RegressionVals();
+    delSel = (perfDataFreqs < 1) | (perfDataFreqs > 341.33);
+    if notched
+        for hfi = 1:length(harmonFreqs)
+            pwlFreqL = harmonFreqs(hfi,1);
+            pwlFreqH = harmonFreqs(hfi,2);
+            selVec = perfDataFreqs >= pwlFreqL & perfDataFreqs <= pwlFreqH;
+            delSel(selVec) = true;
+        end
+    end
+    perfDataModel(delSel) = [];
+    perfDataFreqs(delSel) = [];
+
+    % Extrapolate ideal spectrum
+    [p, S] = polyfit(perfDataFreqs, perfDataModel, polyOrder);
+    [idealSignalSpectrum, ~] = polyval(p, fftFreqs, S);
+end
+function channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, dataWin, polyOrder, ideal_spctrm, notched, harmonFreqs)
     
     nSamples = size(dataWin,2);
     nrMtgs = size(mtgLabels,1);
@@ -48,17 +87,18 @@ function channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, data
     time = startSample/fs + (0:length(dataWin)-1)/fs;
 
     %% Get ideal spectrum
-    [perfDataFreqs, perfDataModel] = getPerfEEGChannAvg_RegressionVals();
-    delSel = false(length(perfDataFreqs),1);
-    if notched
-        for hfi = 1:length(harmonFreqs)
-            pwlFreqL = harmonFreqs(hfi,1);
-            pwlFreqH = harmonFreqs(hfi,2);
-            selVec = perfDataFreqs >= pwlFreqL & perfDataFreqs <= pwlFreqH;
-            delSel(selVec) = true;
-        end
-    end
-    perfDataModel(delSel) = [];
+    % [perfDataFreqs, perfDataModel] = getPerfEEGChannAvg_RegressionVals();
+    % delSel = false(length(perfDataFreqs),1);
+    % if notched
+    %     for hfi = 1:length(harmonFreqs)
+    %         pwlFreqL = harmonFreqs(hfi,1);
+    %         pwlFreqH = harmonFreqs(hfi,2);
+    %         selVec = perfDataFreqs >= pwlFreqL & perfDataFreqs <= pwlFreqH;
+    %         delSel(selVec) = true;
+    %     end
+    % end
+    % perfDataModel(delSel) = [];
+    perfDataModel = ideal_spctrm;
 
     %% Get ChannSpec and ChannAvg Spectrum Regression
     avgDataSpctrm = zeros(1, length(fftFreqs));
@@ -120,52 +160,62 @@ function channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, data
         %chNI = mean([chSpecModelR2, avgData_PerfData_R2]);
         channSpecNI(mi) = chNI;
 
-        ss = 1600*1024;
+        ss = 1610*1024;
         chpidx = 3;
         plotOk = (mi == chpidx && startSample > ss-500 && startSample < ss+500);
         if plotOk
             close all;
-            subplot(3,4,1)
-            chData = dataWin(mi,:);
+            subplot(2,4,1)
+            chData = dataWin(mi,:)/1000;
             plot(time, chData, '-k');
+            ylabel("Amplitude (uV)");
+            xlabel("Time (s)");
             legend("Chann.Signal")
             title(mtgLabels{mi})
             
-            subplot(3,4,5)
+            subplot(2,4,5)
             bpChData = getBandpassedSignal(fs, 512, 80, 500,chData);
             plot(time, bpChData, '-k');
             ylim([prctile(bpChData,0.15), prctile(bpChData,99.85)])
             legend("BP Chann.Signal")
             title({strcat("Bandpassed ", mtgLabels{mi}); "(80-500 Hz)"})
+            ylabel("Amplitude (uV)");
+            xlabel("Time (s)");
             set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
             
             %% N_1
-            subplot(3,4,[2 6])
+            subplot(2,4,[2 6])
             plot(fftFreqs, chDataSpctrm, '-k'); hold on;
             plot(fftFreqs, chSpecModelY, '-r', 'LineWidth', 2); hold on;
             legend("Chann.Spctrm", "Chann.SpctrmModel");
-            titleStr = {"NI_1, Channel Spectrum"; "vs"; "Channel Spectrum Model"; strcat("NI_1 = ", num2str(chSpecModelR2, '%.2f'))};
+            titleStr = {strcat("NI_1=", num2str(chSpecModelR2, '%.2f')); "Channel Spectrum"; "vs"; "Channel Spectrum Model"};
             title(titleStr)
+            ylabel("Power (dB)");
+            xlabel("Frequency (Hz)");
             
             %% N_2
-            subplot(3,4,[3 7])
+            subplot(2,4,[3 7])
             plot(fftFreqs, avgDataSpctrm, '-k'); hold on;
             plot(fftFreqs, chSpecModelY, '-r', 'LineWidth', 2); hold on;
             plot(fftFreqs, avgDataModelY, '-g', 'LineWidth', 2); hold on;
             legend("Avg.Chann.Spctrm", "Chann.SpctrmModel", "Avg.Chann.Spctrm.Model");
-            titleStr = {"NI_2, Channel Spectrum Model"; "vs"; "Avg.Channel Spectrum Model"; strcat("NI_2 = ", num2str(chSpecChAvgModelsR2, '%.2f'))};
+            titleStr = {strcat("NI_2=", num2str(chSpecChAvgModelsR2, '%.2f')); "Channel Spectrum Model"; "vs"; "Avg.Channel Spectrum Model"};
             title(titleStr)
+            ylabel("Power (dB)");
+            xlabel("Frequency (Hz)");
             
             %% N_3
-            subplot(3,4,[4 8])
+            subplot(2,4,[4 8])
             plot(fftFreqs, chDataSpctrm, '-k'); hold on;
             plot(fftFreqs, chSpecModelY, '-r', 'LineWidth', 2); hold on;
             plot(fftFreqs, perfDataModel, '-m', 'LineWidth', 2); hold on;
             legend("Chann.Spctrm", "Chann.SpctrmModel", "Ideal Spctrm");
-            titleStr = {"NI_3, Channel Spectrum Model"; "vs"; "Ideal Spectrum Model"; strcat("NI_3 = ", num2str(avgData_PerfData_R2, '%.2f'))};
+            titleStr = {strcat("NI_3=", num2str(avgData_PerfData_R2, '%.2f')); "Channel Spectrum Model"; "vs"; "Ideal Spectrum Model"};
             title(titleStr)
+            ylabel("Power (dB)");
+            xlabel("Frequency (Hz)");
             
-            sgtitle({mtgLabels{mi}; strcat("Channel Specfic NI:", num2str(chNI, '%.2f'))});
+            sgtitle(strcat(mtgLabels{mi}, ", NI=", num2str(chNI, '%.2f')), 'FontSize', 28);
             
             set(gcf, 'Position', get(0, 'Screensize'), 'color','w');
             % figFilename = strcat("F:\Postdoc_Calgary\Presentations\images\", mtgLabels{mi}, '_ChannSpec_N2', '.png');

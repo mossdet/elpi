@@ -25,7 +25,7 @@ function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple,
     mtgSignalsRipple = zeros(nrMtgs, nrSamples);
     mtgSignalsFR = zeros(nrMtgs, nrSamples);
 
-    notchWidth=2;
+    notchWidth=5;
     notchOrder = notchSettings.order;
     harmonFreqs = [notchSettings.freqs - notchWidth, notchSettings.freqs + notchWidth];
     
