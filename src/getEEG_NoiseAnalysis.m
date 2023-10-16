@@ -68,6 +68,7 @@ function idealSignalSpectrum = getIdealSignalSpectrum(fs, wdwSize, polyOrder, no
     [p, S] = polyfit(perfDataFreqs, perfDataModel, polyOrder);
     [idealSignalSpectrum, ~] = polyval(p, fftFreqs, S);
 end
+
 function channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, dataWin, polyOrder, ideal_spctrm, notched, harmonFreqs)
     
     nSamples = size(dataWin,2);
@@ -160,9 +161,9 @@ function channSpecNI = getPerfChannSpecNoiseIdx(fs, startSample, mtgLabels, data
         %chNI = mean([chSpecModelR2, avgData_PerfData_R2]);
         channSpecNI(mi) = chNI;
 
-        ss = 1610*1024;
-        chpidx = 3;
-        plotOk = (mi == chpidx && startSample > ss-500 && startSample < ss+500);
+        %ss = 1610*1024;
+        %chpidx = 3;
+        plotOk = 0;%(mi == chpidx && startSample > ss-500 && startSample < ss+500);
         if plotOk
             close all;
             subplot(2,4,1)
