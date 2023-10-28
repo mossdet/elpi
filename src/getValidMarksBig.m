@@ -1,30 +1,31 @@
-function [wdwRelevantMarks, timeChannTypeValidIdxNr] = getValidMarksBig(marksList, wdwLoc, wdwLenSamples, mtgLabels, validAnnotTypes)
+function [wdwRelevantMarks, timeChannTypeValidIdxNr] = getValidMarksBig(fs, marksList, wdwLimsT, mtgLabels, validAnnotTypes)
     wdwRelevantMarks = [];
     timeChannTypeValidIdxNr = [];
     if ~isempty(marksList)
-        startSamplesVec = cell2mat(marksList(:,5));
-        endSamplesVec = cell2mat(marksList(:,6));
-        currWdwMargins =  [wdwLoc, wdwLoc + wdwLenSamples];
-        timeChannTypeValidMask = false(length(startSamplesVec),1);
+        startTimesVec = cell2mat(marksList(:,3));
+        endTimesVec = cell2mat(marksList(:,4));
+        %startSamplesVec = startTimesVec*fs;
+        %endSamplesVec = endTimesVec*fs;
+        timeChannTypeValidMask = false(length(startTimesVec),1);
         timeChannTypeValidIdxNr = [];
 
-        relevantA = startSamplesVec >= currWdwMargins(1) & startSamplesVec <= currWdwMargins(2);
-        relevantB = endSamplesVec >= currWdwMargins(1) & endSamplesVec <= currWdwMargins(2);
-        relevantC = startSamplesVec <= currWdwMargins(1) & endSamplesVec >= currWdwMargins(2);
+        relevantA = startTimesVec >= wdwLimsT(1) & startTimesVec <= wdwLimsT(2);
+        relevantB = endTimesVec >= wdwLimsT(1) & endTimesVec <= wdwLimsT(2);
+        relevantC = startTimesVec <= wdwLimsT(1) & endTimesVec >= wdwLimsT(2);
         timeRelevantMask = relevantA | relevantB | relevantC;
 
         badSegSel = ismember(marksList(:,2), 'Bad');
         badSegMarks = marksList(badSegSel,:);
-        inBadMask = false(length(startSamplesVec),1);
+        inBadMask = false(length(startTimesVec),1);
         for bsi = 1:size(badSegMarks,1)
-            bss = badSegMarks{bsi,5};
-            bse = badSegMarks{bsi,6};
+            bss = badSegMarks{bsi,3};
+            bse = badSegMarks{bsi,4};
             bschName = badSegMarks{bsi,1};
             channSpec = badSegMarks{bsi,8};
             if channSpec
-                inBadMask(ismember(marksList(:,1), bschName) & startSamplesVec>=bss & endSamplesVec <=bse) = true();
+                inBadMask(ismember(marksList(:,1), bschName) & startTimesVec>=bss & endTimesVec <=bse) = true();
             else
-                inBadMask(startSamplesVec>=bss & endSamplesVec <=bse) = true();
+                inBadMask(startTimesVec>=bss & endTimesVec <=bse) = true();
             end
         end
         inBadMask = inBadMask & not(badSegSel);
