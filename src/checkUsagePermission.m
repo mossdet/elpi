@@ -69,7 +69,7 @@ function approvedComps = approvedCompsList()
     approvedComps = {};
     
     pc.Label = 'Lenovo IdepadGaming3';
-    pc.MAC = '8C-8C-AA-E1-9B-A2';
+    pc.MAC = '0A-00-27-00-00-12';
     pc.osName = 'LAPTOP-TFQFNF6U';
     pc.RAM = 34;
     pc.permits.generalUse = true();
