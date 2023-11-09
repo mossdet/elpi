@@ -26,8 +26,12 @@ function [mtgLabels, mtgSignals, mtgSignalsLow, mtgSignalsHFO, mtgSignalsRipple,
     mtgSignalsFR = zeros(nrMtgs, nrSamples);
 
     notchWidth=5;
-    notchOrder = notchSettings.order;
-    harmonFreqs = [notchSettings.freqs - notchWidth, notchSettings.freqs + notchWidth];
+    notchOrder = 0;
+    harmonFreqs = [];
+    if notchOK
+        notchOrder = notchSettings.order;
+        harmonFreqs = [notchSettings.freqs - notchWidth, notchSettings.freqs + notchWidth];
+    end
     
     for mi = 1:nrMtgs
         sigA = unipSignals(cnsldtMtgList{mi,2},:);
